@@ -5,6 +5,8 @@ import os
 from dotenv import load_dotenv
 import certifi
 from bson import ObjectId
+from typing import Optional
+
 
 
 load_dotenv()
@@ -68,3 +70,56 @@ async def delete_euron_data(item_id: str):
     doc["_id"] = str(doc["_id"])
     doc["message"] = "Document deleted successfully"
     return doc
+
+@app.put("/euron/full_update/{item_id}")
+async def update_euron_full(item_id: str, data: EuronData):
+    if not ObjectId.is_valid(item_id):
+        raise HTTPException(status_code=400, detail="Invalid ObjectId format")
+
+    existing = await euron_data.find_one({"_id": ObjectId(item_id)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    await euron_data.replace_one(
+        {"_id": ObjectId(item_id)},
+        data.dict()
+    )
+
+    updated = await euron_data.find_one({"_id": ObjectId(item_id)})
+    updated["_id"] = str(updated["_id"])
+    updated["message"] = "Full update successful"
+    return updated
+
+
+
+class EuronPartialUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[int] = None
+    city: Optional[str] = None
+    course: Optional[str] = None
+
+
+@app.patch("/euron/partial_update/{item_id}")
+async def update_euron_partial(item_id: str, data: EuronPartialUpdate):
+    if not ObjectId.is_valid(item_id):
+        raise HTTPException(status_code=400, detail="Invalid ObjectId format")
+
+    update_data = data.dict(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields provided for update")
+
+    existing = await euron_data.find_one({"_id": ObjectId(item_id)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    await euron_data.update_one(
+        {"_id": ObjectId(item_id)},
+        {"$set": update_data}
+    )
+
+    updated = await euron_data.find_one({"_id": ObjectId(item_id)})
+    updated["_id"] = str(updated["_id"])
+    updated["message"] = "Partial update successful"
+    return updated
+
